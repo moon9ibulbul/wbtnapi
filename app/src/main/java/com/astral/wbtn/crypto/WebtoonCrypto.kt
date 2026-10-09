@@ -1,6 +1,6 @@
 package com.astral.wbtn.crypto
 
-import android.util.Base64
+import java.util.Base64
 import java.math.BigInteger
 import java.net.URLEncoder
 import java.security.KeyFactory
@@ -36,7 +36,7 @@ object WebtoonCrypto {
         sha1Hmac.init(secretKey)
 
         val macData = sha1Hmac.doFinal(dataToSign)
-        return Base64.encodeToString(macData, Base64.NO_WRAP).trim()
+        return Base64.getEncoder().encodeToString(macData).trim()
     }
 
     fun buildSignedUrl(unsignedUrl: String, currentTime: String): String {
