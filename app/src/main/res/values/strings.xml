@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">AstralWBTN</string>
+    <string name="not_logged">🔴 No Logged In</string>
+    <string name="login_btn">Login</string>
+    <string name="change_acc">Change Account</string>
+    <string name="url_ph">Enter URL or series ID (e.g., 2154)</string>
+    <string name="analyze">Analyze</string>
+    <string name="ep_list">Episode List</string>
+    <string name="quick_sel">Quick Select (e.g., 1-5, 8, 10)</string>
+    <string name="ranges">Ranges...</string>
+    <string name="select">Select</string>
+    <string name="clear">Clear Selection</string>
+    <string name="download">📥 DOWNLOAD</string>
+</resources>
