@@ -47,10 +47,13 @@ data class EpisodeListContent(
 data class EpisodeItem(
     val episodeNo: Int,
     val episodeTitle: String,
-    val productInfo: Boolean? = null,
+    val productInfo: JsonElement? = null,
     var allowsAd: Boolean = false,
     var price: Int = 0
-)
+) {
+    val isFree: Boolean
+        get() = productInfo == null || productInfo.isJsonNull || (productInfo.isJsonPrimitive && !productInfo.asBoolean)
+}
 
 data class ProductRightListWrapper(
     val rightList: List<ProductRightItem>?

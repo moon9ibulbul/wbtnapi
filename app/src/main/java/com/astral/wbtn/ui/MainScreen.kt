@@ -195,7 +195,7 @@ fun MainScreen(
                                         EpisodeItem(
                                             episodeNo = epNo,
                                             episodeTitle = title,
-                                            productInfo = true,
+                                            productInfo = com.google.gson.JsonPrimitive(true),
                                             allowsAd = allowsAd,
                                             price = price
                                         )
@@ -277,7 +277,7 @@ fun MainScreen(
                         val right = rightsMap[ep.episodeNo]
 
                         val statusText = when {
-                            ep.productInfo != true -> "[FREE]"
+                            ep.isFree -> "[FREE]"
                             right?.hasRight == true -> if (right.infinite) "[PURCHASED]" else "[UNLOCKED Temp]"
                             ep.allowsAd && ep.price > 0 -> "[PAID: ${ep.price}c / ADS]"
                             ep.allowsAd -> "[ONLY ADS/PASS]"
