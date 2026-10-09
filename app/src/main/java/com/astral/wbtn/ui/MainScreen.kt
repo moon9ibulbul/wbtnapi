@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,7 +32,7 @@ fun MainScreen(
 ) {
     val coroutineScope = rememberCoroutineScope()
 
-    var isLoggedIn by remember { mutableStateOf(false) }
+    var isLoggedIn by remember { mutableStateOf(repository.isLoggedIn) }
     var username by remember { mutableStateOf("") }
     var coinBalance by remember { mutableIntStateOf(-1) }
     var showLoginDialog by remember { mutableStateOf(false) }
@@ -50,14 +52,49 @@ fun MainScreen(
     var isDownloading by remember { mutableStateOf(false) }
     var downloadProgressText by remember { mutableStateOf("") }
 
+    val logScrollState = rememberScrollState()
+
     fun appendLog(msg: String) {
         consoleLogs += "$msg\n"
     }
 
+    LaunchedEffect(Unit) {
+        if (repository.isLoggedIn) {
+            coroutineScope.launch(Dispatchers.IO) {
+                try {
+                    val info = repository.getMemberInfo()
+                    val balance = repository.getCoinBalance()
+                    withContext(Dispatchers.Main) {
+                        if (info != null) {
+                            isLoggedIn = true
+                            username = info.nickname
+                            coinBalance = balance
+                            appendLog("✅ Restored session for $username")
+                        } else {
+                            // Session expired
+                            repository.clearSession()
+                            isLoggedIn = false
+                            appendLog("⚠️ Stored session expired or invalid.")
+                        }
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        appendLog("⚠️ Failed to verify saved session: ${e.message}")
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(consoleLogs) {
+        logScrollState.animateScrollTo(logScrollState.maxValue)
+    }
+
     fun extractSeriesNo(input: String): Int? {
         val trimmed = input.trim()
+        if (trimmed.isEmpty()) return null
         if (trimmed.all { it.isDigit() }) return trimmed.toIntOrNull()
-        val regex = Regex("""title_no=(\d+)""")
+        val regex = Regex("""(?i)title[_-]?no=(\d+)""")
         val match = regex.find(trimmed)
         return match?.groupValues?.get(1)?.toIntOrNull()
     }
@@ -182,7 +219,7 @@ fun MainScreen(
                             }
                         }
                     },
-                    enabled = !isAnalyzing && isLoggedIn,
+                    enabled = !isAnalyzing,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00DC64))
                 ) {
                     Text("Analyze")
@@ -324,6 +361,7 @@ fun MainScreen(
                     .height(120.dp)
                     .background(Color.Black)
                     .padding(8.dp)
+                    .verticalScroll(logScrollState)
             ) {
                 Text(consoleLogs, color = Color.Green, fontSize = 11.sp)
             }
@@ -337,56 +375,82 @@ fun MainScreen(
 
         AlertDialog(
             onDismissRequest = { if (!isLoggingIn) showLoginDialog = false },
-            title = { Text("Login to LINE Webtoon") },
+            title = { Text(if (isLoggedIn) "Account Info" else "Login to LINE Webtoon") },
             text = {
-                Column {
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
-                        label = { Text("Email") }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Password") },
-                        visualTransformation = PasswordVisualTransformation()
-                    )
+                if (isLoggedIn) {
+                    Column {
+                        Text("Logged in as: $username", fontWeight = FontWeight.Bold)
+                        if (coinBalance >= 0) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Coins: $coinBalance 🪙")
+                        }
+                    }
+                } else {
+                    Column {
+                        OutlinedTextField(
+                            value = email,
+                            onValueChange = { email = it },
+                            label = { Text("Email") }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            label = { Text("Password") },
+                            visualTransformation = PasswordVisualTransformation()
+                        )
+                    }
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        isLoggingIn = true
-                        coroutineScope.launch(Dispatchers.IO) {
-                            val success = repository.login(email, password)
-                            if (success) {
-                                val info = repository.getMemberInfo()
-                                val balance = repository.getCoinBalance()
-                                withContext(Dispatchers.Main) {
-                                    isLoggedIn = true
-                                    username = info?.nickname ?: "User"
-                                    coinBalance = balance
-                                    appendLog("✅ Logged in as $username")
-                                    isLoggingIn = false
-                                    showLoginDialog = false
-                                }
-                            } else {
-                                withContext(Dispatchers.Main) {
-                                    appendLog("❌ Login failed.")
-                                    isLoggingIn = false
+                if (isLoggedIn) {
+                    Button(
+                        onClick = {
+                            repository.clearSession()
+                            isLoggedIn = false
+                            username = ""
+                            coinBalance = -1
+                            showLoginDialog = false
+                            appendLog("🔴 Logged out.")
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                    ) {
+                        Text("Logout")
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            isLoggingIn = true
+                            coroutineScope.launch(Dispatchers.IO) {
+                                val success = repository.login(email, password)
+                                if (success) {
+                                    val info = repository.getMemberInfo()
+                                    val balance = repository.getCoinBalance()
+                                    withContext(Dispatchers.Main) {
+                                        isLoggedIn = true
+                                        username = info?.nickname ?: "User"
+                                        coinBalance = balance
+                                        appendLog("✅ Logged in as $username")
+                                        isLoggingIn = false
+                                        showLoginDialog = false
+                                    }
+                                } else {
+                                    withContext(Dispatchers.Main) {
+                                        appendLog("❌ Login failed.")
+                                        isLoggingIn = false
+                                    }
                                 }
                             }
-                        }
-                    },
-                    enabled = !isLoggingIn
-                ) {
-                    Text(if (isLoggingIn) "Logging in..." else "Login")
+                        },
+                        enabled = !isLoggingIn
+                    ) {
+                        Text(if (isLoggingIn) "Logging in..." else "Login")
+                    }
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showLoginDialog = false }) {
-                    Text("Cancel")
+                    Text(if (isLoggedIn) "Close" else "Cancel")
                 }
             }
         )
