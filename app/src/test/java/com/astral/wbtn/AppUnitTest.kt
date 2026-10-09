@@ -1,11 +1,15 @@
 package com.astral.wbtn
 
+import com.astral.wbtn.api.EpisodeItem
 import com.astral.wbtn.crypto.WebtoonCrypto
 import com.astral.wbtn.ui.RangeParser
+import com.google.gson.Gson
 import org.junit.Assert.*
 import org.junit.Test
 
 class AppUnitTest {
+
+    private val gson = Gson()
 
     @Test
     fun testDeviceKeyGeneration() {
@@ -53,5 +57,80 @@ class AppUnitTest {
         val parsed = RangeParser.parseRangeString(rangeStr)
         val expected = setOf(1, 2, 3, 7)
         assertEquals(expected, parsed)
+    }
+
+    @Test
+    fun testEpisodeItemDeserializationWithObjectProductInfo() {
+        val json = """
+            {
+                "episodeNo": 8,
+                "episodeTitle": "Episode 8",
+                "productInfo": {
+                    "productId": "linewebtoon-WEBTOON-123-8",
+                    "saleType": "PREVIEW"
+                }
+            }
+        """.trimIndent()
+
+        val episode = gson.fromJson(json, EpisodeItem::class.java)
+        assertNotNull(episode)
+        assertEquals(8, episode.episodeNo)
+        assertEquals("Episode 8", episode.episodeTitle)
+        assertNotNull(episode.productInfo)
+        assertTrue(episode.productInfo!!.isJsonObject)
+        assertFalse(episode.isFree)
+    }
+
+    @Test
+    fun testEpisodeItemDeserializationWithNullOrMissingProductInfo() {
+        val jsonNull = """
+            {
+                "episodeNo": 1,
+                "episodeTitle": "Episode 1",
+                "productInfo": null
+            }
+        """.trimIndent()
+
+        val episodeNull = gson.fromJson(jsonNull, EpisodeItem::class.java)
+        assertNotNull(episodeNull)
+        assertTrue(episodeNull.isFree)
+
+        val jsonMissing = """
+            {
+                "episodeNo": 2,
+                "episodeTitle": "Episode 2"
+            }
+        """.trimIndent()
+
+        val episodeMissing = gson.fromJson(jsonMissing, EpisodeItem::class.java)
+        assertNotNull(episodeMissing)
+        assertTrue(episodeMissing.isFree)
+    }
+
+    @Test
+    fun testEpisodeItemDeserializationWithBooleanProductInfo() {
+        val jsonTrue = """
+            {
+                "episodeNo": 3,
+                "episodeTitle": "Episode 3",
+                "productInfo": true
+            }
+        """.trimIndent()
+
+        val episodeTrue = gson.fromJson(jsonTrue, EpisodeItem::class.java)
+        assertNotNull(episodeTrue)
+        assertFalse(episodeTrue.isFree)
+
+        val jsonFalse = """
+            {
+                "episodeNo": 4,
+                "episodeTitle": "Episode 4",
+                "productInfo": false
+            }
+        """.trimIndent()
+
+        val episodeFalse = gson.fromJson(jsonFalse, EpisodeItem::class.java)
+        assertNotNull(episodeFalse)
+        assertTrue(episodeFalse.isFree)
     }
 }

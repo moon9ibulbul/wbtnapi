@@ -42,7 +42,7 @@ class Downloader(
             val rightInfo = rightsMap[epNo]
             var hasRight = rightInfo?.hasRight == true
             var isInfinite = rightInfo?.infinite == true
-            val isFree = episode.productInfo == null || episode.productInfo == false
+            val isFree = episode.isFree
 
             if (!isFree && !hasRight) {
                 val liveRight = repository.productRight(seriesNo, epNo)
