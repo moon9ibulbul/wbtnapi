@@ -1,5 +1,6 @@
 package com.astral.wbtn.api
 
+import android.content.Context
 import com.astral.wbtn.crypto.WebtoonCrypto
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -12,7 +13,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-class WebtoonRepository {
+class WebtoonRepository(private val context: Context? = null) {
 
     val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -21,9 +22,39 @@ class WebtoonRepository {
 
     val gson = Gson()
 
-    var neoSes: String = ""
-    var neoChk: String = ""
-    var deviceKey: String = WebtoonCrypto.generateDeviceKey()
+    private val prefs = context?.getSharedPreferences("wbtn_session", Context.MODE_PRIVATE)
+
+    var neoSes: String = prefs?.getString("neo_ses", "") ?: ""
+        private set
+    var neoChk: String = prefs?.getString("neo_chk", "") ?: ""
+        private set
+    var deviceKey: String = prefs?.getString("device_key", "")?.ifEmpty { null }
+        ?: WebtoonCrypto.generateDeviceKey().also { key ->
+            prefs?.edit()?.putString("device_key", key)?.apply()
+        }
+        private set
+
+    fun saveSession(ses: String, chk: String) {
+        neoSes = ses
+        neoChk = chk
+        prefs?.edit()
+            ?.putString("neo_ses", ses)
+            ?.putString("neo_chk", chk)
+            ?.putString("device_key", deviceKey)
+            ?.apply()
+    }
+
+    fun clearSession() {
+        neoSes = ""
+        neoChk = ""
+        prefs?.edit()
+            ?.remove("neo_ses")
+            ?.remove("neo_chk")
+            ?.apply()
+    }
+
+    val isLoggedIn: Boolean
+        get() = neoSes.isNotEmpty()
 
     suspend fun getCurrentTime(): String = withContext(Dispatchers.IO) {
         val request = Request.Builder()
@@ -91,8 +122,10 @@ class WebtoonRepository {
         val loginType = object : TypeToken<WebtoonApiResponse<Map<String, Any>>>() {}
         val loginResp = sendRequest(loginUrl, "POST", null, loginType)
 
-        neoSes = loginResp?.get("ses")?.toString() ?: ""
+        val ses = loginResp?.get("ses")?.toString() ?: ""
+        if (ses.isEmpty()) return@withContext false
 
+        var chk = ""
         val devInfoUrl = "https://global.apis.naver.com/lineWebtoon/webtoon/setDeviceInfo?deviceKey=$deviceKey&appType=LINEWEBTOON&pushToken=&pushCode=FCMV1&serviceZone=GLOBAL&v=1&language=en&locale=en&platform=APP_ANDROID"
 
         val currTime = getCurrentTime()
@@ -101,7 +134,7 @@ class WebtoonRepository {
             .url(signedUrl)
             .header("User-Agent", WebtoonCrypto.USER_AGENT)
             .header("wtu", deviceKey)
-            .header("Cookie", "NEO_SES=\"$neoSes\"; NEO_CHK=\"$neoChk\"")
+            .header("Cookie", "NEO_SES=\"$ses\"")
             .get()
             .build()
 
@@ -114,13 +147,14 @@ class WebtoonRepository {
                     if (start != -1) {
                         val sub = c.substring(start + 9)
                         val end = sub.indexOf("\"")
-                        if (end != -1) neoChk = sub.substring(0, end)
+                        if (end != -1) chk = sub.substring(0, end)
                     }
                 }
             }
         }
 
-        return@withContext neoSes.isNotEmpty()
+        saveSession(ses, chk)
+        return@withContext true
     }
 
     suspend fun getMemberInfo(): MemberInfoResult? {

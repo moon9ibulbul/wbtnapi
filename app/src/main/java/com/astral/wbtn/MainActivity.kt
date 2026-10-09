@@ -18,7 +18,7 @@ import com.astral.wbtn.ui.MainScreen
 
 class MainActivity : ComponentActivity() {
 
-    private val repository by lazy { WebtoonRepository() }
+    private val repository by lazy { WebtoonRepository(applicationContext) }
     private val downloader by lazy { Downloader(applicationContext, repository) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
