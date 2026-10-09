@@ -81,7 +81,10 @@ class WebtoonRepository(private val context: Context? = null) {
             .url(signedUrl)
             .header("User-Agent", WebtoonCrypto.USER_AGENT)
             .header("wtu", deviceKey)
-            .header("Content-Length", "0")
+
+        if (jsonBody == null && method.equals("GET", ignoreCase = true)) {
+            requestBuilder.header("Content-Length", "0")
+        }
 
         if (neoSes.isNotEmpty() && neoChk.isNotEmpty()) {
             requestBuilder.header("Cookie", "NEO_SES=\"$neoSes\"; NEO_CHK=\"$neoChk\"")
@@ -105,6 +108,9 @@ class WebtoonRepository(private val context: Context? = null) {
         client.newCall(requestBuilder.build()).execute().use { response ->
             val responseText = response.body?.string() ?: ""
             val parsed = gson.fromJson<WebtoonApiResponse<T>>(responseText, typeToken.type)
+            if (parsed?.message?.errorCode != null) {
+                return@withContext null
+            }
             return@withContext parsed?.message?.result
         }
     }
@@ -206,8 +212,10 @@ class WebtoonRepository(private val context: Context? = null) {
         sendRequest(url, "GET", null, type)
     }
 
-    suspend fun buyProduct(productId: String, saleUnitId: String, price: Int) {
-        val url = "https://global.apis.naver.com/lineWebtoon/webtoon/buyProduct?v=1&serviceZone=GLOBAL&language=en&locale=en&platform=APP_ANDROID"
+    suspend fun buyProduct(productId: String, saleUnitId: String, price: Int): Boolean {
+        val encodedProductId = java.net.URLEncoder.encode(productId, "UTF-8")
+        val encodedSaleUnitId = java.net.URLEncoder.encode(saleUnitId, "UTF-8")
+        val url = "https://global.apis.naver.com/lineWebtoon/webtoon/buyProduct?method=POST&productId=$encodedProductId&productSaleUnitId=$encodedSaleUnitId&price=$price&v=1&serviceZone=GLOBAL&language=en&locale=en&platform=APP_ANDROID"
         val body = mapOf(
             "method" to "POST",
             "productId" to productId,
@@ -215,7 +223,8 @@ class WebtoonRepository(private val context: Context? = null) {
             "price" to price
         )
         val type = object : TypeToken<WebtoonApiResponse<Any>>() {}
-        sendRequest(url, "POST", body, type)
+        val res = sendRequest(url, "POST", body, type)
+        return res != null
     }
 
     suspend fun episodeInfoWithLogin(titleNo: Int, episodeNo: Int): EpisodeInfoDetail? {

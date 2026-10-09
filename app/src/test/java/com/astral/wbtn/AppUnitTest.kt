@@ -133,4 +133,45 @@ class AppUnitTest {
         assertNotNull(episodeFalse)
         assertTrue(episodeFalse.isFree)
     }
+
+    @Test
+    fun testBuyProductUrlConstructionAndSigning() {
+        val productId = "linewebtoon-WEBTOON-123-8"
+        val saleUnitId = "$productId-reward_ad-1"
+        val price = 0
+        val encodedProductId = java.net.URLEncoder.encode(productId, "UTF-8")
+        val encodedSaleUnitId = java.net.URLEncoder.encode(saleUnitId, "UTF-8")
+
+        val unsignedUrl = "https://global.apis.naver.com/lineWebtoon/webtoon/buyProduct?method=POST&productId=$encodedProductId&productSaleUnitId=$encodedSaleUnitId&price=$price&v=1&serviceZone=GLOBAL&language=en&locale=en&platform=APP_ANDROID"
+        val currentTime = "1791542425046"
+        val signedUrl = WebtoonCrypto.buildSignedUrl(unsignedUrl, currentTime)
+
+        assertTrue(signedUrl.contains("method=POST"))
+        assertTrue(signedUrl.contains("productId=$encodedProductId"))
+        assertTrue(signedUrl.contains("productSaleUnitId=$encodedSaleUnitId"))
+        assertTrue(signedUrl.contains("price=0"))
+        assertTrue(signedUrl.contains("msgpad=1791542425046"))
+        assertTrue(signedUrl.contains("&md="))
+    }
+
+    @Test
+    fun testWebtoonApiResponseParsingWithError() {
+        val jsonError = """
+            {
+                "message": {
+                    "result": null,
+                    "error_code": "025",
+                    "message": "Time limit exceeded"
+                }
+            }
+        """.trimIndent()
+
+        val type = object : com.google.gson.reflect.TypeToken<com.astral.wbtn.api.WebtoonApiResponse<Any>>() {}
+        val parsed = gson.fromJson<com.astral.wbtn.api.WebtoonApiResponse<Any>>(jsonError, type.type)
+
+        assertNotNull(parsed)
+        assertNotNull(parsed.message)
+        assertEquals("025", parsed.message?.errorCode)
+        assertNull(parsed.message?.result)
+    }
 }
