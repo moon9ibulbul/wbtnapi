@@ -80,21 +80,36 @@ class Downloader(
                     onLog("📺 Simulating Ad view (32s)...")
                     delay(32000)
                     repository.getImageSecureToken()
-                    repository.buyProduct(productId, "$productId-reward_ad-1", 0)
-                    adsUsed++
-                    onLog("✅ Ad claimed successfully.")
+                    val adClaimed = repository.buyProduct(productId, "$productId-reward_ad-1", 0)
+                    if (adClaimed) {
+                        adsUsed++
+                        onLog("✅ Ad claimed successfully.")
+                    } else {
+                        onLog("❌ Failed to claim ad for episode $epNo.")
+                        return@forEachIndexed
+                    }
                 } else if (allowsDailyPass && dailyPassUsed < 1) {
-                    repository.buyProduct(productId, "$productId-complete_daily_pass-1", 0)
-                    dailyPassUsed++
-                    onLog("✅ Daily pass claimed.")
+                    val passClaimed = repository.buyProduct(productId, "$productId-complete_daily_pass-1", 0)
+                    if (passClaimed) {
+                        dailyPassUsed++
+                        onLog("✅ Daily pass claimed.")
+                    } else {
+                        onLog("❌ Failed to claim daily pass for episode $epNo.")
+                        return@forEachIndexed
+                    }
                 } else {
                     if (coinBalance in 0..<price) {
                         onLog("❌ Insufficient coins (Have: $coinBalance, Need: $price). Skipping.")
                         return@forEachIndexed
                     }
-                    repository.buyProduct(productId, "$productId-$saleTypeStr-1", price)
-                    coinBalance = maxOf(0, coinBalance - price)
-                    onLog("✅ Episode bought with coins.")
+                    val bought = repository.buyProduct(productId, "$productId-$saleTypeStr-1", price)
+                    if (bought) {
+                        coinBalance = maxOf(0, coinBalance - price)
+                        onLog("✅ Episode bought with coins.")
+                    } else {
+                        onLog("❌ Failed to buy episode $epNo with coins.")
+                        return@forEachIndexed
+                    }
                 }
             }
 
